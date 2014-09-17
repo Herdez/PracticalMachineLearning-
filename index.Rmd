@@ -1,0 +1,145 @@
+
+Practical Machine Learning Project
+================================================================
+
+
+Background
+================================================================
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, the goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset). 
+
+
+Data
+================================================================
+
+The training data for this project are available here: 
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+Goal Project
+================================================================
+
+The goal is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. All other variables can be use as predictor. Show how I built my model, how I used cross validation, what I think the expected out of sample error is, and why I made the choices I did. This prediction model also to predict 20 different test cases from the test data are available here: https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+Environment
+================================================================
+
+We set library Knitr.
+
+```{r}
+library(knitr)
+opts_chunk$set(echo = TRUE, results = 'hold')
+```
+
+Load libraries and Set Seed.
+```{r}
+library(caret)
+library(rpart)
+library(randomForest)
+set.seed(357)
+```
+
+Preprocessing the Data
+================================================================
+
+Data getting and cleaning.
+```{r}
+fileSource <-"/media/OS_/documentos/coursera-cursos/Machine Learning/Assignement/pml-training.csv"
+
+pml_data_csv <- read.csv(fileSource, header=TRUE, sep=",", na.strings=c("NA",""))
+pml_data_csv <- pml_data_csv[,-1] 
+```
+
+Data sets partitions definitions.
+```{r}
+inTrain = createDataPartition(pml_data_csv$classe, p=0.60, list=FALSE)
+training = pml_data_csv[inTrain,]
+testing = pml_data_csv[-inTrain,]
+```
+
+Remove columns that doesn't have data.
+```{r}
+noNA <- c((colSums(!is.na(training[,-ncol(training)])) >= 0.6*nrow(training)))
+training   <-  training[,noNA]
+testing <- testing[,noNA]
+```
+
+Modeling
+================================================================
+
+No need for cross-validation in Random Forest or a separate tests set to get an unbiased estimate of the test set error. It is estimated internally, during the execution
+
+```{r}
+model <- randomForest(classe~.,data=training)
+model
+```
+
+Verification of variable importance measures.
+```{r}
+importance(model)
+```
+Confusion Matrix for evaluating model results.
+```{r}
+confusionMatrix(predict(model,newdata=testing[,-ncol(testing)]),testing$classe)
+```
+
+Accurancy (testing data set).
+```{r}
+accurancy <-c(as.numeric(predict(model,newdata=testing[,-ncol(testing)])==testing$classe))
+accurancy <-sum(accurancy)*100/nrow(testing)
+```
+
+Model Accuracy= `r accurancy`%
+
+Model Test (Predicting the new values in the testing csv provided)
+===============================================================
+Data getting and cleaning.
+```{r}
+fileSource <- "/media/OS_/documentos/coursera-cursos/Machine Learning/Assignement/pml-testing.csv"
+pml_data_csv <- read.csv(fileSource, header=TRUE, sep=",", na.strings=c("NA",""))
+
+pml_data_csv <- pml_data_csv[,-1] 
+pml_data_csv <- pml_data_csv[ , noNA] 
+pml_data_csv <- pml_data_csv[,-ncol(pml_data_csv)] 
+```
+
+Preprocessing test dataset
+```{r}
+testing <- rbind(training[100, -59] , pml_data_csv) 
+row.names(testing) <- c(100, 1:20)
+```
+
+Predicting
+```{r}
+predicting <- predict(model,newdata=testing[-1,])
+predicting
+```
+
+Prediction to files
+```{r}
+prediction_to_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("/media/OS_/documentos/coursera-cursos/Machine Learning/Assignement/problem_id_", i ,".txt")
+    write.table(x[i], file = filename, quote = FALSE,
+                row.names = FALSE, col.names = FALSE)
+  }
+}
+prediction_to_files(predicting)
+```
+
+Conclusion
+==================================================================
+Since the greatest model accuracy level (`r accurancy`%), the next predictions will be correct:
+```{r}
+library(ggplot2)
+qplot(predicting,colour=predicting,main="Classe Predictions")
+```
+
+Exercises exactly according to the specification (Class A).
+Throwing the elbows to the front (Class B).
+Lifting the dumbbell only halfway (Class C).
+Lowering the dumbbell only halfway (Class D).
+Throwing the hips to the front (Class E).
+
+Class A corresponds to the specified execution of the exercise, while the other 4 classes correspond to common mistakes. Thus, we see 35% participants belong to the Class A and 65% participants belong to the other 4 classes.
